@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ImageStream
+metadata:
+  annotations:
+    openshift.io/display-name: Schema Registry
+  name: ocp-schema-registry
+spec:
+  tags:
+  - annotations: null
+    from:
+      kind: DockerImage
+      name: confluentinc/cp-schema-registry:3.3.0
+    importPolicy: {}
+    name: "3.3.0"
+  - annotations: null
+    from:
+      kind: ImageStreamTag
+      name: "3.3.0"
+    importPolicy: {}
+    name: "3.3.x"
+  - annotations: null
+    from:
+      kind: DockerImage
+      name: confluentinc/cp-schema-registry:latest
+    importPolicy: {}
+    name: latest

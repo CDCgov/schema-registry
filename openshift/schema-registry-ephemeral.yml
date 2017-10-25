@@ -1,0 +1,158 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: schema-registry-ephemeral-template
+message: |-
+  The following service(s) have been created in your project: ${SCHEMAREGISTRY_SERVICE_NAME}.
+
+   Schema Registry Port: ${SCHEMAREGISTRY_SERVICE_NAME}:8081
+metadata:
+  annotations:
+    description: |-
+      Schema Registry provides a service layer for your metadata. It provides a RESTful
+      interface for storing and retrieving Avro schemas. It stores a versioned history
+      of all schemas, provides multiple compatibility settings and allows evolution of
+      schemas according to the configured compatibility setting. It provides serializers
+      that plug into Kafka clients that handle schema storage and retrieval for Kafka
+      messages that are sent in the Avro format.
+
+      This instance does not use persistent storage.
+
+      WARNING: Any data stored will be lost upon pod destruction. Only use this template for testing
+    openshift.io/display-name: Schema Registry (Ephemeral)
+    tags: database,schemaregistry
+    template.openshift.io/documentation-url:
+      https://docs.confluent.io/current/schema-registry/docs/index.html
+    template.openshift.io/long-description: This template provides a standalone Schema
+      Registry server for Kafka.  The data is not stored on persistent storage,
+      so any restart of the service will result in all data being lost.
+    template.openshift.io/provider-display-name: SDP Team
+    template.openshift.io/support-url: https://svcmgr.cdc.gov/
+  creationTimestamp: null
+  name: schema-registry-ephemeral
+objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: null
+    name: '${SCHEMAREGISTRY_SERVICE_NAME}'
+  spec:
+    ports:
+    - name: registry
+      protocol: TCP
+      port: 8081
+      targetPort: 8081
+    selector:
+      name: '${SCHEMAREGISTRY_SERVICE_NAME}'
+    sessionAffinity: None
+    type: ClusterIP
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    creationTimestamp: null
+    name: '${SCHEMAREGISTRY_SERVICE_NAME}'
+  spec:
+    replicas: 1
+    selector:
+      name: '${SCHEMAREGISTRY_SERVICE_NAME}'
+    strategy:
+      type: Rolling
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          name: '${SCHEMAREGISTRY_SERVICE_NAME}'
+      spec:
+        containers:
+        - capabilities: {}
+          env:
+          - name: SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL
+            value: "${REGISTRY_KAFKASTORE_CONNECTION_URL}"
+          - name: SCHEMA_REGISTRY_HOST_NAME
+            value: "${REGISTRY_HOST_NAME}"
+          - name: SCHEMA_REGISTRY_LISTENERS
+            value: http://0.0.0.0:8081
+          image: ' '
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            initialDelaySeconds: 30
+            tcpSocket:
+              port: 8081
+            timeoutSeconds: 1
+          name: schemaregistry
+          ports:
+          - containerPort: 8081
+            protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: 8081
+            timeoutSeconds: 1
+          resources:
+            limits:
+              memory: ${MEMORY_LIMIT}
+          securityContext:
+            capabilities: {}
+            privileged: false
+          terminationMessagePath: /dev/termination-log
+          volumeMounts:
+          - mountPath: /etc/schema-registry/secrets
+            name: '${SCHEMAREGISTRY_SERVICE_NAME}-secrets'
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        volumes:
+        - emptyDir:
+            medium: ''
+          name: '${SCHEMAREGISTRY_SERVICE_NAME}-secrets'
+    triggers:
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - schemaregistry
+        from:
+          kind: ImageStreamTag
+          name: ${SCHEMAREGISTRY_IMAGE}:${SCHEMAREGISTRY_VERSION}
+          namespace: ${NAMESPACE}
+        lastTriggerImage: ""
+      type: ImageChange
+    - type: ConfigChange
+  status: {}
+parameters:
+- name: MEMORY_LIMIT
+  displayName: Memory Limit
+  description: Maximum amount of memory the container can use.
+  required: true
+  value: 1Gi
+- name: NAMESPACE
+  displayName: Namespace
+  description: The OpenShift Namespace where the ImageStream resides.
+  value: openshift
+- name: SCHEMAREGISTRY_SERVICE_NAME
+  displayName: Schema Registry Service Name
+  description: The name of the OpenShift Service exposed for this instance.
+  required: true
+  value: schemaregistry
+- name: SCHEMAREGISTRY_IMAGE
+  displayName: Schema Registry Image Name
+  description: The name of the Schema Registry ImageStream to be used.
+  required: true
+  value: ocp-schema-registry
+- name: SCHEMAREGISTRY_VERSION
+  displayName: Version of the Schema Registry Image
+  description: Version of the Schema Registry image to be used (3.3.x, 3.3.0 or latest)
+  required: true
+  value: "3.3.x"
+- name: REGISTRY_KAFKASTORE_CONNECTION_URL
+  displayName: Kafka Store Connection URL
+  description: ZooKeeper URL for the Kafka cluster.
+  required: true
+  value: zookeeper:2181
+- name: REGISTRY_HOST_NAME
+  displayName: Schema Registry Host Name
+  description: The host name advertised in ZooKeeper. Make sure to set this if
+    running Schema Registry with multiple nodes. Hostname must be resolveable because
+    slave nodes serve registration requests indirectly by simply forwarding them to
+    the current master, and returning the response supplied by the master. For more
+    information, please refer to the Schema Registry documentation on Single Master
+    Architecture.
+  required: true
+  value: schemaregistry
